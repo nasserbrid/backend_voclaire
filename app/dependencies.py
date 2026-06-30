@@ -4,6 +4,7 @@ from fastapi import Cookie, Depends, HTTPException, status
 
 from app.logger import logger
 from app.repositories.llm_usage_repository import LlmUsageRepository
+from app.repositories.review_repository import ReviewRepository
 from app.repositories.stt_usage_repository import SttUsageRepository
 from app.repositories.transcription_repository import TranscriptionRepository
 from app.repositories.user_repository import UserRepository
@@ -33,6 +34,11 @@ def get_stt_usage_repository() -> SttUsageRepository:
     database = get_db()
     repository = SttUsageRepository(database)
     return repository
+
+
+def get_review_repository() -> ReviewRepository:
+    database = get_db()
+    return ReviewRepository(database)
 
 
 async def get_current_user(
