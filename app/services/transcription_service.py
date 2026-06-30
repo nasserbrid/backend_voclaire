@@ -1,0 +1,195 @@
+import uuid
+from datetime import datetime, timezone
+
+import httpx
+
+from app.logger import logger
+from app.repositories.llm_usage_repository import LlmUsageRepository
+from app.repositories.stt_usage_repository import SttUsageRepository
+from app.repositories.transcription_repository import TranscriptionRepository
+from app.schemas.transcription import TranscriptionOut
+from app.services import audio_service, llm, r2
+from config.settings import settings
+
+STT_FREE_MONTHLY_SECONDS = 60 * 60       # 1 heure
+STT_FREE_MAX_FILE_SECONDS = 30 * 60      # 30 minutes
+
+
+class TranscriptionNotFound(Exception):
+    pass
+
+
+class QuotaExceeded(Exception):
+    pass
+
+
+class AudioTooLong(Exception):
+    pass
+
+
+class SttQuotaExceeded(Exception):
+    def __init__(self, remaining_minutes: int) -> None:
+        self.remaining_minutes = remaining_minutes
+
+
+def _doc_to_out(doc: dict) -> TranscriptionOut:
+    return TranscriptionOut(
+        id=str(doc["_id"]),
+        text=doc["text"],
+        improved_text=doc.get("improved_text"),
+        file_name=doc["file_name"],
+        file_size=doc["file_size"],
+        duration_seconds=doc.get("duration_seconds"),
+        created_at=doc["created_at"],
+    )
+
+
+async def create(
+    file_bytes: bytes,
+    file_name: str,
+    content_type: str,
+    user_id: str,
+    user_plan: str,
+    transcription_repo: TranscriptionRepository,
+    stt_usage_repo: SttUsageRepository,
+) -> TranscriptionOut:
+    now = datetime.now(timezone.utc)
+    duration_seconds = audio_service.get_audio_duration_seconds(file_bytes)
+
+    if user_plan == "free":
+        if duration_seconds > STT_FREE_MAX_FILE_SECONDS:
+            raise AudioTooLong()
+        used = await stt_usage_repo.get_seconds_used(user_id, now.year, now.month)
+        remaining = STT_FREE_MONTHLY_SECONDS - used
+        if duration_seconds > remaining:
+            remaining_minutes = int(remaining // 60)
+            raise SttQuotaExceeded(remaining_minutes)
+
+    endpoint = "/stt/pro" if user_plan == "pro" else "/stt"
+    logger.info(f"Envoi de '{file_name}' ({len(file_bytes)} bytes) à ml-api{endpoint}")
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        ml_response = await client.post(
+            f"{settings.ML_API_URL}{endpoint}",
+            files={"file": (file_name, file_bytes, content_type)},
+        )
+        ml_response.raise_for_status()
+
+    transcription_text = ml_response.json()["text"]
+    logger.info(f"Transcription reçue : {len(transcription_text)} caractères")
+
+    r2_key = f"{user_id}/{uuid.uuid4()}-{file_name}"
+    await r2.upload_audio(file_bytes=file_bytes, key=r2_key, content_type=content_type)
+
+    transcription_id = await transcription_repo.create(
+        user_id=user_id,
+        text=transcription_text,
+        file_name=file_name,
+        file_size=len(file_bytes),
+        r2_key=r2_key,
+    )
+    logger.info(f"Transcription sauvegardée : {transcription_id}")
+
+    if user_plan == "free":
+        await stt_usage_repo.add_seconds(user_id, now.year, now.month, int(duration_seconds))
+
+    return TranscriptionOut(
+        id=transcription_id,
+        text=transcription_text,
+        file_name=file_name,
+        file_size=len(file_bytes),
+        duration_seconds=duration_seconds,
+        created_at=now,
+    )
+
+
+async def list_by_user(
+    user_id: str,
+    transcription_repo: TranscriptionRepository,
+) -> list[TranscriptionOut]:
+    documents = await transcription_repo.find_by_user_id(user_id=user_id)
+    return [_doc_to_out(doc) for doc in documents]
+
+
+async def improve(
+    transcription_id: str,
+    user_id: str,
+    mode: str,
+    user_plan: str,
+    transcription_repo: TranscriptionRepository,
+    llm_usage_repo: LlmUsageRepository,
+    free_quota: int,
+) -> TranscriptionOut:
+    transcription = await transcription_repo.find_one_by_id_and_user_id(
+        transcription_id=transcription_id,
+        user_id=user_id,
+    )
+    if transcription is None:
+        raise TranscriptionNotFound()
+
+    if mode == "structured_meeting":
+        if user_plan != "pro":
+            raise ValueError("Mode réservé au plan Pro")
+        structured_content = await llm.improve_text(text=transcription["text"], mode="structured_meeting")
+        await transcription_repo.set_structured_content(
+            transcription_id=transcription_id,
+            content=structured_content,
+        )
+        logger.info(f"Réunion structurée sauvegardée : {transcription_id}")
+        return TranscriptionOut(
+            id=transcription_id,
+            text=transcription["text"],
+            improved_text=transcription.get("improved_text"),
+            structured_content=structured_content,
+            file_name=transcription["file_name"],
+            file_size=transcription["file_size"],
+            duration_seconds=transcription.get("duration_seconds"),
+            created_at=transcription["created_at"],
+        )
+
+    if user_plan == "free":
+        usage_count = await llm_usage_repo.count_this_month(user_id=user_id)
+        if usage_count >= free_quota:
+            raise QuotaExceeded()
+
+    improved = await llm.improve_text(text=transcription["text"], mode=mode)
+
+    await transcription_repo.set_improved_text(
+        transcription_id=transcription_id,
+        improved_text=improved,  # type: ignore[arg-type]
+    )
+    await llm_usage_repo.record(user_id=user_id)
+    logger.info(f"Amélioration LLM sauvegardée : {transcription_id} (mode={mode})")
+
+    return TranscriptionOut(
+        id=transcription_id,
+        text=transcription["text"],
+        improved_text=improved,  # type: ignore[arg-type]
+        file_name=transcription["file_name"],
+        file_size=transcription["file_size"],
+        duration_seconds=transcription.get("duration_seconds"),
+        created_at=transcription["created_at"],
+    )
+
+
+async def delete(
+    transcription_id: str,
+    user_id: str,
+    transcription_repo: TranscriptionRepository,
+) -> None:
+    document = await transcription_repo.find_one_by_id_and_user_id(
+        transcription_id=transcription_id,
+        user_id=user_id,
+    )
+    if document is None:
+        raise TranscriptionNotFound()
+
+    r2_key = document["r2_key"]
+
+    await transcription_repo.delete_by_id(transcription_id=transcription_id)
+    logger.info(f"Transcription supprimée de MongoDB : {transcription_id}")
+
+    try:
+        await r2.delete_audio(key=r2_key)
+    except Exception as error:
+        logger.warning(f"Échec suppression R2 (orphelin) pour la clé '{r2_key}' : {error}")
