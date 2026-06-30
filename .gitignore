@@ -17,6 +17,4 @@ dist/
 build/
 .pytest_cache/
 
-# uv
-.python-version
-uv.lock
+
