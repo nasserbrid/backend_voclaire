@@ -41,6 +41,7 @@ async def create_checkout_session(
         cancel_url=settings.STRIPE_CANCEL_URL,
         client_reference_id=user_id,
         customer_email=user_email,
+        metadata={"billing_period": body.billing_period},
     )
 
     checkout_url = session.url
@@ -69,6 +70,25 @@ async def create_portal_session(
     return {"url": portal_url}
 
 
+@router.post("/test-email")
+async def test_email(body: dict) -> dict:
+    to_email = body.get("email", "")
+    if not to_email:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Champ 'email' requis",
+        )
+    billing_period = body.get("billing_period", "monthly")
+    try:
+        await asyncio.to_thread(send_payment_confirmation, to_email, billing_period)
+    except Exception as email_error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(email_error),
+        )
+    return {"ok": True}
+
+
 @router.post("/webhook")
 async def stripe_webhook(
     request: Request,
@@ -90,15 +110,28 @@ async def stripe_webhook(
         )
 
     event_type = event["type"]
+    logger.info(f"Webhook Stripe reçu : {event_type}")
 
     if event_type == "checkout.session.completed":
         session_data = event["data"]["object"]
         user_id = session_data["client_reference_id"]
         customer_id = session_data["customer"]
-        user_email = session_data.get("customer_email", "")
+        try:
+            user_email = session_data["customer_email"] or ""
+        except (KeyError, TypeError):
+            user_email = ""
+        if not user_email and user_id:
+            user = await user_repo.find_by_id(user_id)
+            if user is not None:
+                user_email = user["email"]
+                logger.info(f"Email récupéré depuis MongoDB pour user {user_id}")
+        try:
+            billing_period = session_data["metadata"]["billing_period"]
+        except (KeyError, TypeError):
+            billing_period = "monthly"
         await payment_service.activate_pro(user_id, customer_id, user_repo)
         try:
-            await asyncio.to_thread(send_payment_confirmation, user_email)
+            await asyncio.to_thread(send_payment_confirmation, user_email, billing_period)
         except Exception as email_error:
             logger.warning(f"Échec envoi email confirmation : {email_error}")
 

@@ -6,13 +6,14 @@ from app.logger import logger
 from config.settings import settings
 
 
-def send_payment_confirmation(to_email: str) -> None:
-    html_body = """
+def send_payment_confirmation(to_email: str, billing_period: str = "monthly") -> None:
+    billing_label = "mensuel" if billing_period == "monthly" else "annuel"
+    html_body = f"""
     <html>
     <body style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 24px;">
         <h1 style="color: #10b981;">Bienvenue dans voclaire Pro !</h1>
         <p>Bonjour,</p>
-        <p>Votre abonnement <strong>voclaire Pro</strong> est maintenant actif. Vous avez accès à toutes les fonctionnalités premium :</p>
+        <p>Votre abonnement <strong>voclaire Pro {billing_label}</strong> est maintenant actif. Vous avez accès à toutes les fonctionnalités premium :</p>
         <ul>
             <li>Transcription audio illimitée</li>
             <li>Post-traitement LLM illimité (correction, reformulation, résumé)</li>
