@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     JWT_SECRET: str
     JWT_EXPIRE_MINUTES: int = 10080  # 7 jours
     CORS_ORIGINS: str = "http://localhost:5173"
+    FRONTEND_URL: str = "http://localhost:5173"
 
     GOOGLE_ID_CLIENT_VOCLAIRE: str
     GOOGLE_SECRET_CLIENT_VOCLAIRE: str

@@ -21,7 +21,7 @@ router = APIRouter(prefix="/auth", tags=["google-auth"])
 OAUTH_STATE_COOKIE = "oauth_state"
 
 # URL du frontend vers laquelle rediriger après connexion réussie
-FRONTEND_URL = "http://localhost:5173"
+FRONTEND_URL = settings.FRONTEND_URL
 
 
 @router.get("/google")

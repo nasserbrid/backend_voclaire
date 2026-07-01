@@ -21,7 +21,7 @@ def send_payment_confirmation(to_email: str, billing_period: str = "monthly") ->
             <li>Modèle Whisper fine-tuné pour le français</li>
         </ul>
         <p>
-            <a href="http://localhost:5173/app"
+            <a href="{settings.FRONTEND_URL}/app"
                style="display: inline-block; background-color: #10b981; color: white;
                       padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold;">
                 Accéder à mon espace
