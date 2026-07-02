@@ -6,7 +6,8 @@ from pydantic import BaseModel
 
 class TranscriptionOut(BaseModel):
     id: str
-    text: str
+    status: str = "done"
+    text: Optional[str] = None
     improved_text: Optional[str] = None
     structured_content: Optional[dict] = None
     file_name: str

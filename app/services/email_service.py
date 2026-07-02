@@ -1,3 +1,4 @@
+import asyncio
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -46,3 +47,38 @@ def send_payment_confirmation(to_email: str, billing_period: str = "monthly") ->
         server.sendmail(settings.SMTP_USER, to_email, message.as_string())
 
     logger.info(f"Email de confirmation envoyé à {to_email}")
+
+
+async def send_contact_notification(
+    from_email: str,
+    from_plan: str,
+    subject: str,
+    message: str,
+) -> None:
+    def _send() -> None:
+        html_body = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 24px;">
+        <h2 style="color: #10b981;">[voclaire] Nouveau message de contact</h2>
+        <p><strong>De :</strong> {from_email}</p>
+        <p><strong>Plan :</strong> {from_plan}</p>
+        <p><strong>Sujet :</strong> {subject}</p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 16px 0;" />
+        <p style="white-space: pre-wrap;">{message}</p>
+    </body>
+    </html>
+    """
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"[voclaire contact] {subject}"
+        msg["From"] = settings.SMTP_USER
+        msg["To"] = settings.SMTP_USER
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+            server.starttls()
+            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            server.sendmail(settings.SMTP_USER, settings.SMTP_USER, msg.as_string())
+
+        logger.info(f"Notification contact reçue de {from_email} : {subject}")
+
+    await asyncio.to_thread(_send)

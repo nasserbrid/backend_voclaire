@@ -6,7 +6,6 @@ from bson import ObjectId
 
 def build_transcription_document(
     user_id: str,
-    text: str,
     file_name: str,
     file_size: int,
     r2_key: str,
@@ -14,7 +13,8 @@ def build_transcription_document(
 ) -> dict:
     document = {
         "user_id": ObjectId(user_id),
-        "text": text,
+        "status": "processing",
+        "text": None,
         "file_name": file_name,
         "file_size": file_size,
         "r2_key": r2_key,

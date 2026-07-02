@@ -41,6 +41,12 @@ def get_review_repository() -> ReviewRepository:
     return ReviewRepository(database)
 
 
+def get_contact_repository():
+    from app.repositories.contact_repository import ContactRepository
+    database = get_db()
+    return ContactRepository(database)
+
+
 async def get_current_user(
     access_token: Optional[str] = Cookie(default=None),
     user_repo: UserRepository = Depends(get_user_repository),

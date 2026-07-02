@@ -1,7 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-
-import httpx
+from typing import Optional
 
 from app.logger import logger
 from app.repositories.llm_usage_repository import LlmUsageRepository
@@ -13,6 +12,7 @@ from config.settings import settings
 
 STT_FREE_MONTHLY_SECONDS = 60 * 60       # 1 heure
 STT_FREE_MAX_FILE_SECONDS = 30 * 60      # 30 minutes
+STT_PRO_MAX_FILE_SECONDS = 180 * 60      # 3 heures
 
 
 class TranscriptionNotFound(Exception):
@@ -35,8 +35,10 @@ class SttQuotaExceeded(Exception):
 def _doc_to_out(doc: dict) -> TranscriptionOut:
     return TranscriptionOut(
         id=str(doc["_id"]),
-        text=doc["text"],
+        status=doc.get("status", "done"),
+        text=doc.get("text"),
         improved_text=doc.get("improved_text"),
+        structured_content=doc.get("structured_content"),
         file_name=doc["file_name"],
         file_size=doc["file_size"],
         duration_seconds=doc.get("duration_seconds"),
@@ -64,38 +66,37 @@ async def create(
         if duration_seconds > remaining:
             remaining_minutes = int(remaining // 60)
             raise SttQuotaExceeded(remaining_minutes)
-
-    endpoint = "/stt/pro" if user_plan == "pro" else "/stt"
-    logger.info(f"Envoi de '{file_name}' ({len(file_bytes)} bytes) à ml-api{endpoint}")
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        ml_response = await client.post(
-            f"{settings.ML_API_URL}{endpoint}",
-            files={"file": (file_name, file_bytes, content_type)},
-        )
-        ml_response.raise_for_status()
-
-    transcription_text = ml_response.json()["text"]
-    logger.info(f"Transcription reçue : {len(transcription_text)} caractères")
+    elif user_plan == "pro":
+        if duration_seconds > STT_PRO_MAX_FILE_SECONDS:
+            raise AudioTooLong()
 
     r2_key = f"{user_id}/{uuid.uuid4()}-{file_name}"
     await r2.upload_audio(file_bytes=file_bytes, key=r2_key, content_type=content_type)
 
     transcription_id = await transcription_repo.create(
         user_id=user_id,
-        text=transcription_text,
         file_name=file_name,
         file_size=len(file_bytes),
         r2_key=r2_key,
+        duration_seconds=duration_seconds,
     )
-    logger.info(f"Transcription sauvegardée : {transcription_id}")
+    logger.info(f"Transcription créée (en attente) : {transcription_id}")
 
-    if user_plan == "free":
-        await stt_usage_repo.add_seconds(user_id, now.year, now.month, int(duration_seconds))
+    from app.tasks.transcription_tasks import transcribe_audio
+    transcribe_audio.delay(
+        transcription_id=transcription_id,
+        r2_key=r2_key,
+        file_name=file_name,
+        content_type=content_type,
+        user_id=user_id,
+        user_plan=user_plan,
+        duration_seconds=duration_seconds,
+    )
 
     return TranscriptionOut(
         id=transcription_id,
-        text=transcription_text,
+        status="processing",
+        text=None,
         file_name=file_name,
         file_size=len(file_bytes),
         duration_seconds=duration_seconds,
@@ -109,6 +110,20 @@ async def list_by_user(
 ) -> list[TranscriptionOut]:
     documents = await transcription_repo.find_by_user_id(user_id=user_id)
     return [_doc_to_out(doc) for doc in documents]
+
+
+async def get_by_id(
+    transcription_id: str,
+    user_id: str,
+    transcription_repo: TranscriptionRepository,
+) -> TranscriptionOut:
+    document = await transcription_repo.find_one_by_id_and_user_id(
+        transcription_id=transcription_id,
+        user_id=user_id,
+    )
+    if document is None:
+        raise TranscriptionNotFound()
+    return _doc_to_out(document)
 
 
 async def improve(
@@ -138,7 +153,8 @@ async def improve(
         logger.info(f"Réunion structurée sauvegardée : {transcription_id}")
         return TranscriptionOut(
             id=transcription_id,
-            text=transcription["text"],
+            status=transcription.get("status", "done"),
+            text=transcription.get("text"),
             improved_text=transcription.get("improved_text"),
             structured_content=structured_content,
             file_name=transcription["file_name"],
@@ -163,7 +179,8 @@ async def improve(
 
     return TranscriptionOut(
         id=transcription_id,
-        text=transcription["text"],
+        status=transcription.get("status", "done"),
+        text=transcription.get("text"),
         improved_text=improved,  # type: ignore[arg-type]
         file_name=transcription["file_name"],
         file_size=transcription["file_size"],

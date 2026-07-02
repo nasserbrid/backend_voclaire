@@ -45,3 +45,14 @@ def _delete_sync(key: str) -> None:
 
 async def delete_audio(key: str) -> None:
     await asyncio.to_thread(_delete_sync, key)
+
+
+def _download_sync(key: str) -> bytes:
+    client = _get_r2_client()
+    response = client.get_object(Bucket=settings.R2_BUCKET_NAME, Key=key)
+    file_bytes: bytes = response["Body"].read()
+    return file_bytes
+
+
+async def download_audio(key: str) -> bytes:
+    return await asyncio.to_thread(_download_sync, key)

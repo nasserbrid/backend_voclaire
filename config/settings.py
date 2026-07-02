@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     STRIPE_CANCEL_URL: str = "http://localhost:5173/pricing"
     STRIPE_CUSTOMER_PORTAL_RETURN_URL: str = "http://localhost:5173/app"
 
+    # Celery + Redis
+    REDIS_URL: str = "redis://localhost:6379/0"
+
     # Email SMTP (confirmation paiement)
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587

@@ -27,7 +27,10 @@ from config.settings import settings
 router = APIRouter(prefix="/transcriptions", tags=["transcriptions"])
 
 
-def _transcription_rate_limit(request: Request) -> str:
+def _transcription_rate_limit(request: Request = None) -> str:  # type: ignore[assignment]
+    # slowapi appelle ce callable sans argument lors de __iter__ (setup interne)
+    if request is None:
+        return "3/minute"
     token = request.cookies.get(COOKIE_NAME)
     if token:
         try:
@@ -39,7 +42,7 @@ def _transcription_rate_limit(request: Request) -> str:
     return "3/minute"
 
 
-@router.post("", response_model=TranscriptionOut, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=TranscriptionOut, status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit(_transcription_rate_limit)
 async def create_transcription(
     request: Request,
@@ -85,6 +88,26 @@ async def create_transcription(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Service de transcription indisponible",
+        )
+
+
+@router.get("/{transcription_id}", response_model=TranscriptionOut)
+async def get_transcription(
+    transcription_id: str,
+    current_user: dict = Depends(get_current_user),
+    transcription_repo: TranscriptionRepository = Depends(get_transcription_repository),
+) -> TranscriptionOut:
+    user_id = str(current_user["_id"])
+    try:
+        return await transcription_service.get_by_id(
+            transcription_id=transcription_id,
+            user_id=user_id,
+            transcription_repo=transcription_repo,
+        )
+    except TranscriptionNotFound:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Transcription introuvable",
         )
 
 
