@@ -33,16 +33,24 @@ async def create_checkout_session(
     user_id = str(current_user["_id"])
     user_email = current_user["email"]
 
-    session = stripe.checkout.Session.create(
-        payment_method_types=["card"],
-        mode="subscription",
-        line_items=[{"price": price_id, "quantity": 1}],
-        success_url=settings.STRIPE_SUCCESS_URL,
-        cancel_url=settings.STRIPE_CANCEL_URL,
-        client_reference_id=user_id,
-        customer_email=user_email,
-        metadata={"billing_period": body.billing_period},
-    )
+    try:
+        session = await asyncio.to_thread(
+            stripe.checkout.Session.create,
+            payment_method_types=["card"],
+            mode="subscription",
+            line_items=[{"price": price_id, "quantity": 1}],
+            success_url=settings.STRIPE_SUCCESS_URL,
+            cancel_url=settings.STRIPE_CANCEL_URL,
+            client_reference_id=user_id,
+            customer_email=user_email,
+            metadata={"billing_period": body.billing_period},
+        )
+    except stripe.StripeError as exc:
+        logger.error(f"Stripe checkout error pour user {user_id} : {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Erreur Stripe — veuillez réessayer",
+        )
 
     checkout_url = session.url
     logger.info(f"Session checkout créée pour user {user_id} ({body.billing_period})")
@@ -60,10 +68,18 @@ async def create_portal_session(
             detail="Aucun abonnement actif",
         )
 
-    portal_session = stripe.billing_portal.Session.create(
-        customer=stripe_customer_id,
-        return_url=settings.STRIPE_CUSTOMER_PORTAL_RETURN_URL,
-    )
+    try:
+        portal_session = await asyncio.to_thread(
+            stripe.billing_portal.Session.create,
+            customer=stripe_customer_id,
+            return_url=settings.STRIPE_CUSTOMER_PORTAL_RETURN_URL,
+        )
+    except stripe.StripeError as exc:
+        logger.error(f"Stripe portal error pour customer {stripe_customer_id} : {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Erreur Stripe — veuillez réessayer",
+        )
 
     portal_url = portal_session.url
     logger.info(f"Session portail créée pour customer {stripe_customer_id}")
