@@ -61,7 +61,7 @@ def transcribe_audio(
     except Exception as exc:
         logger.error(f"[task] Erreur transcription {transcription_id} (tentative {self.request.retries + 1}) : {exc}")
         try:
-            raise self.retry(exc=exc, countdown=60)
+            raise self.retry(exc=exc, countdown=300)
         except MaxRetriesExceededError:
             logger.error(f"[task] Échec définitif : {transcription_id}")
             db = _get_sync_db()
