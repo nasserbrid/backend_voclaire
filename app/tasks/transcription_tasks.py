@@ -34,7 +34,7 @@ def transcribe_audio(
         ml_timeout = 1200.0 if user_plan == "pro" else 120.0
         logger.info(f"[task] Envoi '{file_name}' à ml-api{endpoint}")
 
-        with httpx.Client(timeout=ml_timeout) as client:
+        with httpx.Client(timeout=ml_timeout, verify=False) as client:
             response = client.post(
                 f"{settings.ML_API_URL}{endpoint}",
                 files={"file": (file_name, file_bytes, content_type)},
