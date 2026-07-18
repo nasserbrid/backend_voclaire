@@ -69,7 +69,7 @@ def test_transcribe_audio_success() -> None:
     expected_oid: ObjectId = ObjectId(TRANSCRIPTION_ID)
     mock_transcriptions.update_one.assert_called_once_with(
         {"_id": expected_oid},
-        {"$set": {"text": TRANSCRIBED_TEXT, "status": "done"}},
+        {"$set": {"text": TRANSCRIBED_TEXT, "segments": None, "status": "done"}},
     )
     mock_stt_usage.update_one.assert_called_once()
 
