@@ -31,7 +31,7 @@ def transcribe_audio(
         file_bytes = _download_sync(r2_key)
 
         endpoint = "/stt/pro" if user_plan == "pro" else "/stt"
-        ml_timeout = 1200.0 if user_plan == "pro" else 120.0
+        ml_timeout = min(duration_seconds * 6 + 120, 21600.0)
         logger.info(f"[task] Envoi '{file_name}' à ml-api{endpoint}")
 
         with httpx.Client(timeout=ml_timeout, verify=False) as client:
