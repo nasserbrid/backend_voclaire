@@ -41,13 +41,15 @@ def transcribe_audio(
             )
             response.raise_for_status()
 
-        text: str = response.json()["text"]
+        data = response.json()
+        text: str = data["text"]
+        segments: list | None = data.get("segments")
         logger.info(f"[task] Transcription terminée : {transcription_id} ({len(text)} chars)")
 
         db = _get_sync_db()
         db["transcriptions"].update_one(
             {"_id": ObjectId(transcription_id)},
-            {"$set": {"text": text, "status": "done"}},
+            {"$set": {"text": text, "segments": segments, "status": "done"}},
         )
 
         if user_plan == "free":

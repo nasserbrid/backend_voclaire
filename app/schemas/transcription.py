@@ -10,6 +10,7 @@ class TranscriptionOut(BaseModel):
     text: Optional[str] = None
     improved_text: Optional[str] = None
     structured_content: Optional[dict] = None
+    segments: Optional[list] = None
     file_name: str
     file_size: int
     duration_seconds: Optional[float]
