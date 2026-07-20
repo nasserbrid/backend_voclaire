@@ -11,9 +11,8 @@ async def test_register_ok():
     user_repo.find_by_email = AsyncMock(return_value=None)
     user_repo.create = AsyncMock(return_value="user_id_abc")
 
-    # On mocke hash_password : le service délègue le hachage à auth.py (bcrypt),
-    # on ne teste pas bcrypt ici — seulement la logique du service.
-    with patch("app.services.user_service.hash_password", return_value="hashed_pw"):
+    with patch("app.services.user_service.hash_password", return_value="hashed_pw"), \
+         patch("app.services.user_service.send_welcome_email", new_callable=AsyncMock):
         result = await user_service.register(
             email="nouveau@example.com",
             password="motdepasse",
@@ -23,6 +22,55 @@ async def test_register_ok():
     assert result == {"user_id": "user_id_abc", "plan": "free"}
     user_repo.find_by_email.assert_awaited_once_with("nouveau@example.com")
     user_repo.create.assert_awaited_once()
+
+
+async def test_register_sends_welcome_email():
+    user_repo = MagicMock()
+    user_repo.find_by_email = AsyncMock(return_value=None)
+    user_repo.create = AsyncMock(return_value="user_id_abc")
+
+    with patch("app.services.user_service.hash_password", return_value="hashed_pw"), \
+         patch("app.services.user_service.send_welcome_email", new_callable=AsyncMock) as mock_welcome:
+        await user_service.register(
+            email="nouveau@example.com",
+            password="motdepasse",
+            user_repo=user_repo,
+        )
+
+    mock_welcome.assert_awaited_once_with("nouveau@example.com")
+
+
+async def test_google_new_user_sends_welcome_email():
+    user_repo = MagicMock()
+    user_repo.find_by_google_id = AsyncMock(return_value=None)
+    user_repo.find_by_email = AsyncMock(return_value=None)
+    user_repo.create = AsyncMock(return_value="new_google_user_id")
+
+    with patch("app.services.user_service.send_welcome_email", new_callable=AsyncMock) as mock_welcome:
+        result = await user_service.get_or_create_google_user(
+            google_id="google123",
+            email="google@example.com",
+            user_repo=user_repo,
+        )
+
+    assert result == {"user_id": "new_google_user_id", "plan": "free"}
+    mock_welcome.assert_awaited_once_with("google@example.com")
+
+
+async def test_google_existing_user_no_welcome_email():
+    existing_user = {"_id": "existing_id", "plan": "pro"}
+    user_repo = MagicMock()
+    user_repo.find_by_google_id = AsyncMock(return_value=existing_user)
+
+    with patch("app.services.user_service.send_welcome_email", new_callable=AsyncMock) as mock_welcome:
+        result = await user_service.get_or_create_google_user(
+            google_id="google123",
+            email="existing@example.com",
+            user_repo=user_repo,
+        )
+
+    assert result == {"user_id": "existing_id", "plan": "pro"}
+    mock_welcome.assert_not_awaited()
 
 
 async def test_register_email_already_taken():

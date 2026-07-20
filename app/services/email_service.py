@@ -82,3 +82,28 @@ async def send_contact_notification(
         logger.info(f"Notification contact reçue de {from_email} : {subject}")
 
     await asyncio.to_thread(_send)
+
+
+async def send_welcome_email(to_email: str) -> None:
+    def _send() -> None:
+        body = (
+            "Bonjour,\n\n"
+            "Votre compte Voclaire est prêt.\n\n"
+            f"Pour transcrire votre première réunion en 2 minutes : {settings.FRONTEND_URL}/app\n\n"
+            "Le plan Free inclut 60 min de transcription par mois, sans carte bancaire.\n\n"
+            "Bonne transcription,\n"
+            "Nasser — fondateur de Voclaire"
+        )
+        msg = MIMEText(body, "plain", "utf-8")
+        msg["Subject"] = "Bienvenue sur Voclaire \U0001f389"
+        msg["From"] = settings.SMTP_USER
+        msg["To"] = to_email
+
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+            server.starttls()
+            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            server.sendmail(settings.SMTP_USER, to_email, msg.as_string())
+
+        logger.info(f"Email de bienvenue envoyé à {to_email}")
+
+    await asyncio.to_thread(_send)

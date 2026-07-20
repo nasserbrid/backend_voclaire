@@ -5,6 +5,7 @@ from typing import Optional
 from app.dependencies import get_user_repository
 from app.logger import logger
 from app.repositories.user_repository import UserRepository
+from app.services import user_service
 from app.services.auth import create_jwt
 from app.services.cookie import set_auth_cookie
 from app.services.google_oauth import (
@@ -87,34 +88,13 @@ async def google_callback(
     google_id = google_user["sub"]   # identifiant unique Google
     email = google_user["email"]
 
-    # Étape 1 : chercher par google_id (user déjà connecté via Google)
-    user_by_google_id = await user_repo.find_by_google_id(google_id)
-
-    if user_by_google_id is not None:
-        user_id = str(user_by_google_id["_id"])
-        user_plan = user_by_google_id["plan"]
-        logger.info(f"Connexion Google (compte Google connu) : {email}")
-
-    else:
-        # Étape 2 : chercher par email (user inscrit par formulaire avec le même email)
-        user_by_email = await user_repo.find_by_email(email)
-
-        if user_by_email is not None:
-            # Compte formulaire trouvé → on lie le google_id pour les prochaines connexions
-            user_id = str(user_by_email["_id"])
-            user_plan = user_by_email["plan"]
-            await user_repo.link_google_id(user_id=user_id, google_id=google_id)
-            logger.info(f"Liaison Google sur compte existant : {email}")
-
-        else:
-            # Aucun compte → nouvel utilisateur Google, sans mot de passe
-            user_id = await user_repo.create(
-                email=email,
-                password_hash=None,
-                google_id=google_id,
-            )
-            user_plan = "free"
-            logger.info(f"Inscription via Google (nouveau compte) : {email}")
+    result = await user_service.get_or_create_google_user(
+        google_id=google_id,
+        email=email,
+        user_repo=user_repo,
+    )
+    user_id = result["user_id"]
+    user_plan = result["plan"]
 
     # Générer notre JWT et le stocker dans un cookie HttpOnly
     # Même principe : cookies posés sur le RedirectResponse retourné, pas sur response injecté
