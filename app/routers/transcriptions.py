@@ -1,5 +1,4 @@
-import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
 from app.dependencies import (
     get_current_user,
@@ -12,7 +11,13 @@ from app.logger import logger
 from app.repositories.llm_usage_repository import LlmUsageRepository
 from app.repositories.stt_usage_repository import SttUsageRepository
 from app.repositories.transcription_repository import TranscriptionRepository
-from app.schemas.transcription import ImproveRequest, TranscriptionOut
+from app.schemas.transcription import (
+    ConfirmRequest,
+    ImproveRequest,
+    PresignRequest,
+    PresignResponse,
+    TranscriptionOut,
+)
 from app.services import export_service, transcription_service
 from app.services.auth import decode_jwt
 from app.services.cookie import COOKIE_NAME
@@ -42,28 +47,43 @@ def _transcription_rate_limit(request: Request = None) -> str:  # type: ignore[a
     return "3/minute"
 
 
-@router.post("", response_model=TranscriptionOut, status_code=status.HTTP_202_ACCEPTED)
-@limiter.limit(_transcription_rate_limit)
-async def create_transcription(
+@router.post("/presign", response_model=PresignResponse)
+@limiter.limit("10/minute")
+async def presign_transcription(
     request: Request,
-    file: UploadFile,
+    body: PresignRequest,
+    current_user: dict = Depends(get_current_user),
+) -> PresignResponse:
+    user_id = str(current_user["_id"])
+    upload_url, r2_key = await transcription_service.presign(
+        user_id=user_id,
+        file_name=body.file_name,
+        content_type=body.content_type,
+    )
+    return PresignResponse(upload_url=upload_url, r2_key=r2_key)
+
+
+@router.post("/confirm", response_model=TranscriptionOut, status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit(_transcription_rate_limit)
+async def confirm_transcription(
+    request: Request,
+    body: ConfirmRequest,
     current_user: dict = Depends(get_current_user),
     transcription_repo: TranscriptionRepository = Depends(get_transcription_repository),
     stt_usage_repo: SttUsageRepository = Depends(get_stt_usage_repository),
 ) -> TranscriptionOut:
-    file_bytes = await file.read()
-    file_name = file.filename or "audio"
-    content_type = file.content_type or "audio/mpeg"
     user_id = str(current_user["_id"])
     user_plan = current_user.get("plan", "free")
 
     try:
-        return await transcription_service.create(
-            file_bytes=file_bytes,
-            file_name=file_name,
-            content_type=content_type,
+        return await transcription_service.confirm(
             user_id=user_id,
             user_plan=user_plan,
+            r2_key=body.r2_key,
+            file_name=body.file_name,
+            content_type=body.content_type,
+            file_size=body.file_size,
+            duration_seconds=body.duration_seconds,
             transcription_repo=transcription_repo,
             stt_usage_repo=stt_usage_repo,
         )
@@ -76,18 +96,6 @@ async def create_transcription(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Quota mensuel dépassé. Il vous reste {error.remaining_minutes} minute(s) ce mois-ci. Passez Pro pour une transcription illimitée.",
-        )
-    except httpx.HTTPStatusError as error:
-        logger.error(f"Erreur ml-api {error.response.status_code} : {error.response.text}")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Erreur lors de la transcription audio",
-        )
-    except httpx.RequestError as error:
-        logger.error(f"ml-api injoignable : {error}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Service de transcription indisponible",
         )
 
 

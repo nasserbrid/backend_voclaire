@@ -19,3 +19,21 @@ class TranscriptionOut(BaseModel):
 
 class ImproveRequest(BaseModel):
     mode: str  # "correction" | "reformulation" | "résumé" | "structured_meeting"
+
+
+class PresignRequest(BaseModel):
+    file_name: str
+    content_type: str
+
+
+class PresignResponse(BaseModel):
+    upload_url: str
+    r2_key: str
+
+
+class ConfirmRequest(BaseModel):
+    r2_key: str
+    file_name: str
+    content_type: str
+    file_size: int
+    duration_seconds: float

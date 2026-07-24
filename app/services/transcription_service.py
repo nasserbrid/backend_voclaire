@@ -7,7 +7,7 @@ from app.repositories.llm_usage_repository import LlmUsageRepository
 from app.repositories.stt_usage_repository import SttUsageRepository
 from app.repositories.transcription_repository import TranscriptionRepository
 from app.schemas.transcription import TranscriptionOut
-from app.services import audio_service, llm, r2
+from app.services import llm, r2
 from config.settings import settings
 
 STT_FREE_MONTHLY_SECONDS = 60 * 60       # 1 heure
@@ -46,18 +46,31 @@ def _doc_to_out(doc: dict) -> TranscriptionOut:
     )
 
 
-async def create(
-    file_bytes: bytes,
+async def presign(
+    user_id: str,
     file_name: str,
     content_type: str,
+) -> tuple[str, str]:
+    r2_key = f"{user_id}/{uuid.uuid4()}-{file_name}"
+    upload_url = await r2.generate_presigned_upload_url(key=r2_key, content_type=content_type)
+    return upload_url, r2_key
+
+
+async def confirm(
     user_id: str,
     user_plan: str,
+    r2_key: str,
+    file_name: str,
+    content_type: str,
+    file_size: int,
+    duration_seconds: float,
     transcription_repo: TranscriptionRepository,
     stt_usage_repo: SttUsageRepository,
 ) -> TranscriptionOut:
     now = datetime.now(timezone.utc)
-    duration_seconds = audio_service.get_audio_duration_seconds(file_bytes)
 
+    # Soft gate : duration_seconds est déclarée par le client, non vérifiée ici.
+    # La tâche Celery recalcule la vraie durée après téléchargement depuis R2.
     if user_plan == "free":
         if duration_seconds > STT_FREE_MAX_FILE_SECONDS:
             raise AudioTooLong()
@@ -70,13 +83,10 @@ async def create(
         if duration_seconds > STT_PRO_MAX_FILE_SECONDS:
             raise AudioTooLong()
 
-    r2_key = f"{user_id}/{uuid.uuid4()}-{file_name}"
-    await r2.upload_audio(file_bytes=file_bytes, key=r2_key, content_type=content_type)
-
     transcription_id = await transcription_repo.create(
         user_id=user_id,
         file_name=file_name,
-        file_size=len(file_bytes),
+        file_size=file_size,
         r2_key=r2_key,
         duration_seconds=duration_seconds,
     )
@@ -90,7 +100,7 @@ async def create(
         content_type=content_type,
         user_id=user_id,
         user_plan=user_plan,
-        duration_seconds=duration_seconds,
+        declared_duration_seconds=duration_seconds,
     )
 
     return TranscriptionOut(
@@ -98,7 +108,7 @@ async def create(
         status="processing",
         text=None,
         file_name=file_name,
-        file_size=len(file_bytes),
+        file_size=file_size,
         duration_seconds=duration_seconds,
         created_at=now,
     )

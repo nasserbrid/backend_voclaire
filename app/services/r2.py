@@ -56,3 +56,17 @@ def _download_sync(key: str) -> bytes:
 
 async def download_audio(key: str) -> bytes:
     return await asyncio.to_thread(_download_sync, key)
+
+
+def _generate_presigned_put_url_sync(key: str, content_type: str) -> str:
+    client = _get_r2_client()
+    url: str = client.generate_presigned_url(
+        "put_object",
+        Params={"Bucket": settings.R2_BUCKET_NAME, "Key": key, "ContentType": content_type},
+        ExpiresIn=900,  # 15 minutes
+    )
+    return url
+
+
+async def generate_presigned_upload_url(key: str, content_type: str) -> str:
+    return await asyncio.to_thread(_generate_presigned_put_url_sync, key, content_type)

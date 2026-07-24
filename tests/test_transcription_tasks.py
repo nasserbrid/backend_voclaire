@@ -12,7 +12,8 @@ R2_KEY: str = "user123/uuid-audio.mp3"
 FILE_NAME: str = "audio.mp3"
 CONTENT_TYPE: str = "audio/mpeg"
 USER_ID: str = "user123"
-DURATION_SECONDS: float = 45.0
+DECLARED_DURATION_SECONDS: float = 999.0  # valeur "mentie" par le client au moment du /confirm
+REAL_DURATION_SECONDS: float = 45.0  # valeur recalculée par la tâche après téléchargement R2
 TRANSCRIBED_TEXT: str = "bonjour le monde"
 
 
@@ -41,26 +42,36 @@ def _task_kwargs(user_plan: str = "free") -> dict:
         "content_type": CONTENT_TYPE,
         "user_id": USER_ID,
         "user_plan": user_plan,
-        "duration_seconds": DURATION_SECONDS,
+        "declared_duration_seconds": DECLARED_DURATION_SECONDS,
     }
 
 
-def test_transcribe_audio_success() -> None:
-    """Transcription réussie : update_one avec status=done + stt_usage mis à jour (free)."""
-    mock_http_client: MagicMock = _make_mock_http_client(
-        json_response={"text": TRANSCRIBED_TEXT},
-    )
+def _make_mock_db_with_collections() -> tuple[MagicMock, MagicMock, MagicMock]:
+    """Mock DB avec collections 'transcriptions' et 'stt_usage' distinctes.
 
-    # MagicMock.__getitem__ retourne le même objet pour toutes les clés par défaut.
-    # side_effect permet de distinguer les collections MongoDB.
+    MagicMock.__getitem__ retourne le même objet pour toutes les clés par défaut —
+    side_effect permet de distinguer les deux collections MongoDB.
+    """
     mock_transcriptions: MagicMock = MagicMock()
     mock_stt_usage: MagicMock = MagicMock()
     mock_db: MagicMock = MagicMock()
     mock_db.__getitem__.side_effect = lambda key: (
         mock_transcriptions if key == "transcriptions" else mock_stt_usage
     )
+    return mock_db, mock_transcriptions, mock_stt_usage
+
+
+def test_transcribe_audio_success() -> None:
+    """Transcription réussie : update_one avec status=done + vraie durée + stt_usage mis à jour (free)."""
+    mock_http_client: MagicMock = _make_mock_http_client(
+        json_response={"text": TRANSCRIBED_TEXT},
+    )
+    mock_db, mock_transcriptions, mock_stt_usage = _make_mock_db_with_collections()
+    mock_stt_usage.find_one.return_value = None  # aucun usage ce mois-ci → 0 seconde consommée
 
     with patch("app.tasks.transcription_tasks._download_sync", return_value=b"audio_bytes"), \
+         patch("app.tasks.transcription_tasks.audio_service.get_audio_duration_seconds",
+               return_value=REAL_DURATION_SECONDS), \
          patch("httpx.Client", return_value=mock_http_client), \
          patch("app.tasks.transcription_tasks._get_sync_db", return_value=mock_db):
 
@@ -69,7 +80,12 @@ def test_transcribe_audio_success() -> None:
     expected_oid: ObjectId = ObjectId(TRANSCRIPTION_ID)
     mock_transcriptions.update_one.assert_called_once_with(
         {"_id": expected_oid},
-        {"$set": {"text": TRANSCRIBED_TEXT, "segments": None, "status": "done"}},
+        {"$set": {
+            "text": TRANSCRIBED_TEXT,
+            "segments": None,
+            "status": "done",
+            "duration_seconds": REAL_DURATION_SECONDS,
+        }},
     )
     mock_stt_usage.update_one.assert_called_once()
 
@@ -85,17 +101,20 @@ def test_transcribe_audio_ml_api_failure() -> None:
         json_response={},
         raise_status=http_error,
     )
-    mock_db: MagicMock = MagicMock()
+    mock_db, mock_transcriptions, mock_stt_usage = _make_mock_db_with_collections()
+    mock_stt_usage.find_one.return_value = None
 
     with patch.object(transcribe_audio, "retry", side_effect=MaxRetriesExceededError()), \
          patch("app.tasks.transcription_tasks._download_sync", return_value=b"audio_bytes"), \
+         patch("app.tasks.transcription_tasks.audio_service.get_audio_duration_seconds",
+               return_value=REAL_DURATION_SECONDS), \
          patch("httpx.Client", return_value=mock_http_client), \
          patch("app.tasks.transcription_tasks._get_sync_db", return_value=mock_db):
 
         transcribe_audio.apply(kwargs=_task_kwargs("free"))
 
     expected_oid: ObjectId = ObjectId(TRANSCRIPTION_ID)
-    mock_db["transcriptions"].update_one.assert_called_once_with(
+    mock_transcriptions.update_one.assert_called_once_with(
         {"_id": expected_oid},
         {"$set": {"status": "error"}},
     )
@@ -103,7 +122,7 @@ def test_transcribe_audio_ml_api_failure() -> None:
 
 def test_transcribe_audio_download_failure() -> None:
     """Un échec R2 (_download_sync) épuise les retries et force status=error en MongoDB."""
-    mock_db: MagicMock = MagicMock()
+    mock_db, mock_transcriptions, _mock_stt_usage = _make_mock_db_with_collections()
 
     with patch.object(transcribe_audio, "retry", side_effect=MaxRetriesExceededError()), \
          patch("app.tasks.transcription_tasks._download_sync", side_effect=ConnectionError("R2 unreachable")), \
@@ -112,7 +131,7 @@ def test_transcribe_audio_download_failure() -> None:
         transcribe_audio.apply(kwargs=_task_kwargs("free"))
 
     expected_oid: ObjectId = ObjectId(TRANSCRIPTION_ID)
-    mock_db["transcriptions"].update_one.assert_called_once_with(
+    mock_transcriptions.update_one.assert_called_once_with(
         {"_id": expected_oid},
         {"$set": {"status": "error"}},
     )
