@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel
 
@@ -37,3 +37,4 @@ class ConfirmRequest(BaseModel):
     content_type: str
     file_size: int
     duration_seconds: float
+    source: Literal["file", "recording"]

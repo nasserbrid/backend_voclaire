@@ -10,9 +10,8 @@ from app.logger import logger
 from app.services import audio_service
 from app.services.r2 import _delete_sync, _download_sync
 from app.services.transcription_service import (
-    STT_FREE_MAX_FILE_SECONDS,
-    STT_FREE_MONTHLY_SECONDS,
-    STT_PRO_MAX_FILE_SECONDS,
+    STT_FREE_MAX_ITEM_SECONDS,
+    STT_FREE_MONTHLY_SECONDS_PER_CATEGORY,
 )
 from config.settings import settings
 
@@ -32,6 +31,7 @@ def transcribe_audio(
     user_id: str,
     user_plan: str,
     declared_duration_seconds: float,
+    source: str,
 ) -> None:
     try:
         file_bytes = _download_sync(r2_key)
@@ -43,17 +43,15 @@ def transcribe_audio(
         db = _get_sync_db()
 
         if user_plan == "free":
-            quota_exceeded = real_duration_seconds > STT_FREE_MAX_FILE_SECONDS
+            quota_exceeded = real_duration_seconds > STT_FREE_MAX_ITEM_SECONDS
             if not quota_exceeded:
                 now = datetime.now(timezone.utc)
                 usage_doc = db["stt_usage"].find_one(
-                    {"user_id": user_id, "year": now.year, "month": now.month}
+                    {"user_id": user_id, "year": now.year, "month": now.month, "source": source}
                 )
                 used = usage_doc["seconds_used"] if usage_doc else 0
-                remaining = STT_FREE_MONTHLY_SECONDS - used
+                remaining = STT_FREE_MONTHLY_SECONDS_PER_CATEGORY - used
                 quota_exceeded = real_duration_seconds > remaining
-        elif user_plan == "pro":
-            quota_exceeded = real_duration_seconds > STT_PRO_MAX_FILE_SECONDS
         else:
             quota_exceeded = False
 
@@ -98,7 +96,7 @@ def transcribe_audio(
         if user_plan == "free":
             now = datetime.now(timezone.utc)
             db["stt_usage"].update_one(
-                {"user_id": user_id, "year": now.year, "month": now.month},
+                {"user_id": user_id, "year": now.year, "month": now.month, "source": source},
                 {"$inc": {"seconds_used": int(real_duration_seconds)}},
                 upsert=True,
             )

@@ -43,6 +43,7 @@ def _task_kwargs(user_plan: str = "free") -> dict:
         "user_id": USER_ID,
         "user_plan": user_plan,
         "declared_duration_seconds": DECLARED_DURATION_SECONDS,
+        "source": "file",
     }
 
 

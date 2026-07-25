@@ -84,13 +84,14 @@ async def confirm_transcription(
             content_type=body.content_type,
             file_size=body.file_size,
             duration_seconds=body.duration_seconds,
+            source=body.source,
             transcription_repo=transcription_repo,
             stt_usage_repo=stt_usage_repo,
         )
     except AudioTooLong:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Fichier trop long. Les utilisateurs free sont limités à 30 minutes par audio.",
+            detail="Fichier ou enregistrement trop long. Les utilisateurs free sont limités à 2 heures par élément.",
         )
     except SttQuotaExceeded as error:
         raise HTTPException(

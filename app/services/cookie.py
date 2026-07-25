@@ -1,5 +1,7 @@
 from fastapi import Response
 
+from config.settings import settings
+
 COOKIE_NAME = "access_token"
 COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7  # 7 jours
 
@@ -9,7 +11,7 @@ def set_auth_cookie(response: Response, token: str) -> None:
         key=COOKIE_NAME,
         value=token,
         httponly=True,
-        secure=False,   # Passer à True en production (HTTPS)
+        secure=settings.FRONTEND_URL.startswith("https://"),
         samesite="lax",
         max_age=COOKIE_MAX_AGE_SECONDS,
     )

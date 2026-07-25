@@ -1,4 +1,5 @@
 import asyncio
+import html
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -56,15 +57,19 @@ async def send_contact_notification(
     message: str,
 ) -> None:
     def _send() -> None:
+        safe_from_email = html.escape(from_email)
+        safe_from_plan = html.escape(from_plan)
+        safe_subject = html.escape(subject)
+        safe_message = html.escape(message)
         html_body = f"""
     <html>
     <body style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 24px;">
         <h2 style="color: #10b981;">[voclaire] Nouveau message de contact</h2>
-        <p><strong>De :</strong> {from_email}</p>
-        <p><strong>Plan :</strong> {from_plan}</p>
-        <p><strong>Sujet :</strong> {subject}</p>
+        <p><strong>De :</strong> {safe_from_email}</p>
+        <p><strong>Plan :</strong> {safe_from_plan}</p>
+        <p><strong>Sujet :</strong> {safe_subject}</p>
         <hr style="border: none; border-top: 1px solid #eee; margin: 16px 0;" />
-        <p style="white-space: pre-wrap;">{message}</p>
+        <p style="white-space: pre-wrap;">{safe_message}</p>
     </body>
     </html>
     """

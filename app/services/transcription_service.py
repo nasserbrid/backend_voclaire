@@ -10,9 +10,8 @@ from app.schemas.transcription import TranscriptionOut
 from app.services import llm, r2
 from config.settings import settings
 
-STT_FREE_MONTHLY_SECONDS = 60 * 60       # 1 heure
-STT_FREE_MAX_FILE_SECONDS = 30 * 60      # 30 minutes
-STT_PRO_MAX_FILE_SECONDS = 180 * 60      # 3 heures
+STT_FREE_MONTHLY_SECONDS_PER_CATEGORY = 4 * 60 * 60  # 4h/mois, par catégorie (file/recording)
+STT_FREE_MAX_ITEM_SECONDS = 2 * 60 * 60              # 2h max par élément individuel
 
 
 class TranscriptionNotFound(Exception):
@@ -64,6 +63,7 @@ async def confirm(
     content_type: str,
     file_size: int,
     duration_seconds: float,
+    source: str,
     transcription_repo: TranscriptionRepository,
     stt_usage_repo: SttUsageRepository,
 ) -> TranscriptionOut:
@@ -72,16 +72,13 @@ async def confirm(
     # Soft gate : duration_seconds est déclarée par le client, non vérifiée ici.
     # La tâche Celery recalcule la vraie durée après téléchargement depuis R2.
     if user_plan == "free":
-        if duration_seconds > STT_FREE_MAX_FILE_SECONDS:
+        if duration_seconds > STT_FREE_MAX_ITEM_SECONDS:
             raise AudioTooLong()
-        used = await stt_usage_repo.get_seconds_used(user_id, now.year, now.month)
-        remaining = STT_FREE_MONTHLY_SECONDS - used
+        used = await stt_usage_repo.get_seconds_used(user_id, now.year, now.month, source)
+        remaining = STT_FREE_MONTHLY_SECONDS_PER_CATEGORY - used
         if duration_seconds > remaining:
             remaining_minutes = int(remaining // 60)
             raise SttQuotaExceeded(remaining_minutes)
-    elif user_plan == "pro":
-        if duration_seconds > STT_PRO_MAX_FILE_SECONDS:
-            raise AudioTooLong()
 
     transcription_id = await transcription_repo.create(
         user_id=user_id,
@@ -101,6 +98,7 @@ async def confirm(
         user_id=user_id,
         user_plan=user_plan,
         declared_duration_seconds=duration_seconds,
+        source=source,
     )
 
     return TranscriptionOut(
