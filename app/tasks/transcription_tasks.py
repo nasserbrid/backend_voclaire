@@ -70,7 +70,7 @@ def transcribe_audio(
             return
 
         endpoint = "/stt/pro" if user_plan == "pro" else "/stt"
-        ml_timeout = min(real_duration_seconds * 6 + 120, 21600.0)
+        ml_timeout = min(real_duration_seconds * 6 + 120, 86400.0)  # cap 24h
         logger.info(f"[task] Envoi '{file_name}' à ml-api{endpoint}")
 
         with httpx.Client(timeout=ml_timeout) as client:
