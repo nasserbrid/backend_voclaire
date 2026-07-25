@@ -86,25 +86,6 @@ async def create_portal_session(
     return {"url": portal_url}
 
 
-@router.post("/test-email")
-async def test_email(body: dict) -> dict:
-    to_email = body.get("email", "")
-    if not to_email:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Champ 'email' requis",
-        )
-    billing_period = body.get("billing_period", "monthly")
-    try:
-        await asyncio.to_thread(send_payment_confirmation, to_email, billing_period)
-    except Exception as email_error:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(email_error),
-        )
-    return {"ok": True}
-
-
 @router.post("/webhook")
 async def stripe_webhook(
     request: Request,
