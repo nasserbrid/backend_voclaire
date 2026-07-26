@@ -38,6 +38,7 @@ def _doc_to_out(doc: dict) -> TranscriptionOut:
         text=doc.get("text"),
         improved_text=doc.get("improved_text"),
         structured_content=doc.get("structured_content"),
+        segments=doc.get("segments"),
         file_name=doc["file_name"],
         file_size=doc["file_size"],
         duration_seconds=doc.get("duration_seconds"),
