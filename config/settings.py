@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
 
+    # Monitoring erreurs (Sentry)
+    SENTRY_DSN: str = ""
+
     def get_cors_list(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
 
