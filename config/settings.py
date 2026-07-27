@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     # Monitoring erreurs (Sentry)
     SENTRY_DSN: str = ""
 
+    # Logs centralisés (Better Stack)
+    LOGTAIL_SOURCE_TOKEN: str = ""
+    LOGTAIL_INGESTING_HOST: str = ""
+
     def get_cors_list(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
 
