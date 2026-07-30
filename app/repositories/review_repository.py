@@ -13,14 +13,16 @@ class ReviewRepository:
     async def create(
         self,
         user_id: str,
-        author_name: str,
+        first_name: str,
+        company: str,
         plan: str,
         content: str,
         rating: int,
     ) -> dict:
         document = build_review_document(
             user_id=user_id,
-            author_name=author_name,
+            first_name=first_name,
+            company=company,
             plan=plan,
             content=content,
             rating=rating,

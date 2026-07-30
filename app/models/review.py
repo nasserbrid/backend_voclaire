@@ -5,17 +5,19 @@ from bson import ObjectId
 
 def build_review_document(
     user_id: str,
-    author_name: str,
+    first_name: str,
+    company: str,
     plan: str,
     content: str,
     rating: int,
 ) -> dict:
     return {
         "user_id": ObjectId(user_id),
-        "author_name": author_name,
+        "first_name": first_name,
+        "company": company,
         "plan": plan,
         "content": content,
         "rating": rating,
-        "is_visible": True,
+        "is_visible": False,
         "created_at": datetime.now(timezone.utc),
     }

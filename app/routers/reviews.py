@@ -16,8 +16,10 @@ async def post_review(
     review_repo: ReviewRepository = Depends(get_review_repository),
 ) -> ReviewOut:
     try:
-        review = await review_service.submit(
+        return await review_service.submit(
             user=current_user,
+            first_name=body.first_name,
+            company=body.company,
             content=body.content,
             rating=body.rating,
             review_repo=review_repo,
@@ -27,29 +29,10 @@ async def post_review(
             status_code=status.HTTP_409_CONFLICT,
             detail="Vous avez déjà laissé un avis.",
         )
-    return ReviewOut(
-        id=str(review["_id"]),
-        author_name=review["author_name"],
-        content=review["content"],
-        rating=review["rating"],
-        plan=review["plan"],
-        created_at=review["created_at"],
-    )
 
 
 @router.get("", response_model=list[ReviewOut])
 async def get_reviews(
     review_repo: ReviewRepository = Depends(get_review_repository),
 ) -> list[ReviewOut]:
-    reviews = await review_service.list_public(review_repo=review_repo)
-    return [
-        ReviewOut(
-            id=str(r["_id"]),
-            author_name=r["author_name"],
-            content=r["content"],
-            rating=r["rating"],
-            plan=r.get("plan", "free"),
-            created_at=r["created_at"],
-        )
-        for r in reviews
-    ]
+    return await review_service.list_public(review_repo=review_repo)
