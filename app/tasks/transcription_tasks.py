@@ -75,6 +75,7 @@ def transcribe_audio(
             response = client.post(
                 f"{settings.ML_API_URL}{endpoint}",
                 files={"file": (file_name, file_bytes, content_type)},
+                headers={"X-Internal-Api-Key": settings.ML_API_INTERNAL_KEY},
             )
             response.raise_for_status()
 

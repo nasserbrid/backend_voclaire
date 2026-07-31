@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     # Étape 10 — ml-api + Cloudflare R2
     ML_API_URL: str = "http://localhost:8000"
+    ML_API_INTERNAL_KEY: str = ""
     R2_ACCOUNT_ID: Optional[str] = None
     R2_ACCESS_KEY_ID: Optional[str] = None
     R2_SECRET_ACCESS_KEY: Optional[str] = None
