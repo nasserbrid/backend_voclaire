@@ -8,6 +8,7 @@ from celery.exceptions import MaxRetriesExceededError
 from app.celery_app import celery_app
 from app.logger import logger
 from app.services import audio_service
+from app.services.analytics_service import capture
 from app.services.r2 import _delete_sync, _download_sync
 from app.services.transcription_service import (
     STT_FREE_MAX_ITEM_SECONDS,
@@ -84,6 +85,10 @@ def transcribe_audio(
         segments: list | None = data.get("segments")
         logger.info(f"[task] Transcription terminée : {transcription_id} ({len(text)} chars)")
 
+        is_first_transcription = db["transcriptions"].count_documents(
+            {"user_id": ObjectId(user_id), "status": "done"}
+        ) == 0
+
         db["transcriptions"].update_one(
             {"_id": ObjectId(transcription_id)},
             {"$set": {
@@ -93,6 +98,9 @@ def transcribe_audio(
                 "duration_seconds": real_duration_seconds,
             }},
         )
+
+        if is_first_transcription:
+            capture(user_id, "first_transcription", {"source": source})
 
         if user_plan == "free":
             now = datetime.now(timezone.utc)

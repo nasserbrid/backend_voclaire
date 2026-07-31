@@ -4,6 +4,7 @@ from typing import Optional
 
 from app.logger import logger
 from app.repositories.llm_usage_repository import LlmUsageRepository
+from app.services.analytics_service import capture
 from app.repositories.stt_usage_repository import SttUsageRepository
 from app.repositories.transcription_repository import TranscriptionRepository
 from app.schemas.transcription import TranscriptionOut
@@ -160,6 +161,7 @@ async def improve(
             content=structured_content,
         )
         logger.info(f"Réunion structurée sauvegardée : {transcription_id}")
+        capture(user_id, "llm_call", {"mode": "structured_meeting"})
         return TranscriptionOut(
             id=transcription_id,
             status=transcription.get("status", "done"),
@@ -185,6 +187,7 @@ async def improve(
     )
     await llm_usage_repo.record(user_id=user_id)
     logger.info(f"Amélioration LLM sauvegardée : {transcription_id} (mode={mode})")
+    capture(user_id, "llm_call", {"mode": mode})
 
     return TranscriptionOut(
         id=transcription_id,

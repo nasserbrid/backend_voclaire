@@ -25,7 +25,8 @@ async def test_improve_ok():
     llm_usage_repo.count_this_month = AsyncMock(return_value=3)  # en dessous du quota
     llm_usage_repo.record = AsyncMock()
 
-    with patch("app.services.llm.improve_text", new_callable=AsyncMock) as mock_llm:
+    with patch("app.services.llm.improve_text", new_callable=AsyncMock) as mock_llm, \
+         patch("app.services.transcription_service.capture") as mock_capture:
         mock_llm.return_value = "Texte après correction orthographique."
 
         result = await transcription_service.improve(
@@ -39,6 +40,7 @@ async def test_improve_ok():
         )
 
     assert result.improved_text == "Texte après correction orthographique."
+    mock_capture.assert_called_once_with("user_id_abc", "llm_call", {"mode": "correction"})
     assert result.text == "Texte original de la transcription."
     assert result.id == "trans_id_123"
     transcription_repo.set_improved_text.assert_awaited_once_with(
@@ -94,7 +96,8 @@ async def test_improve_pro_bypasses_quota_check():
     llm_usage_repo = MagicMock()
     llm_usage_repo.record = AsyncMock()
 
-    with patch("app.services.llm.improve_text", new_callable=AsyncMock) as mock_llm:
+    with patch("app.services.llm.improve_text", new_callable=AsyncMock) as mock_llm, \
+         patch("app.services.transcription_service.capture"):
         mock_llm.return_value = "Résumé pro."
 
         result = await transcription_service.improve(

@@ -18,6 +18,7 @@ dependencies = [
     "motor>=3.7.1",
     "openai>=2.44.0",
     "passlib[bcrypt]>=1.7.4",
+    "posthog>=7.35.4",
     "pydantic-settings>=2.14.2",
     "pydub>=0.25.1",
     "pyjwt>=2.13.0",

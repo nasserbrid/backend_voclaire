@@ -12,7 +12,8 @@ async def test_register_ok():
     user_repo.create = AsyncMock(return_value="user_id_abc")
 
     with patch("app.services.user_service.hash_password", return_value="hashed_pw"), \
-         patch("app.services.user_service.send_welcome_email", new_callable=AsyncMock):
+         patch("app.services.user_service.send_welcome_email", new_callable=AsyncMock), \
+         patch("app.services.user_service.capture"):
         result = await user_service.register(
             email="nouveau@example.com",
             password="motdepasse",
@@ -30,7 +31,8 @@ async def test_register_sends_welcome_email():
     user_repo.create = AsyncMock(return_value="user_id_abc")
 
     with patch("app.services.user_service.hash_password", return_value="hashed_pw"), \
-         patch("app.services.user_service.send_welcome_email", new_callable=AsyncMock) as mock_welcome:
+         patch("app.services.user_service.send_welcome_email", new_callable=AsyncMock) as mock_welcome, \
+         patch("app.services.user_service.capture"):
         await user_service.register(
             email="nouveau@example.com",
             password="motdepasse",
@@ -46,7 +48,8 @@ async def test_google_new_user_sends_welcome_email():
     user_repo.find_by_email = AsyncMock(return_value=None)
     user_repo.create = AsyncMock(return_value="new_google_user_id")
 
-    with patch("app.services.user_service.send_welcome_email", new_callable=AsyncMock) as mock_welcome:
+    with patch("app.services.user_service.send_welcome_email", new_callable=AsyncMock) as mock_welcome, \
+         patch("app.services.user_service.capture"):
         result = await user_service.get_or_create_google_user(
             google_id="google123",
             email="google@example.com",

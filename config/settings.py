@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     LOGTAIL_SOURCE_TOKEN: str = ""
     LOGTAIL_INGESTING_HOST: str = ""
 
+    # Analytics produit (PostHog) — funnel signup → first_transcription → llm_call → upgrade
+    POSTHOG_API_KEY: str = ""
+    POSTHOG_HOST: str = "https://eu.i.posthog.com"
+
     def get_cors_list(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
 

@@ -64,6 +64,7 @@ dependencies = [
     { name = "motor" },
     { name = "openai" },
     { name = "passlib", extra = ["bcrypt"] },
+    { name = "posthog" },
     { name = "pydantic-settings" },
     { name = "pydub" },
     { name = "pyjwt" },
@@ -92,6 +93,7 @@ requires-dist = [
     { name = "motor", specifier = ">=3.7.1" },
     { name = "openai", specifier = ">=2.44.0" },
     { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4" },
+    { name = "posthog", specifier = ">=7.35.4" },
     { name = "pydantic-settings", specifier = ">=2.14.2" },
     { name = "pydub", specifier = ">=0.25.1" },
     { name = "pyjwt", specifier = ">=2.13.0" },
@@ -107,6 +109,15 @@ requires-dist = [
 dev = [
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
+]
+
+[[package]]
+name = "backoff"
+version = "2.2.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/47/d7/5bbeb12c44d7c4f2fb5b56abce497eb5ed9f34d85701de869acedd602619/backoff-2.2.1.tar.gz", hash = "sha256:03f829f5bb1923180821643f8753b0502c3b682293992485b0eef2807afa5cba", size = 17001, upload-time = "2022-10-05T19:19:32.061Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/df/73/b6e24bd22e6720ca8ee9a85a0c4a2971af8497d8f3193fa05390cbd46e09/backoff-2.2.1-py3-none-any.whl", hash = "sha256:63579f9a0628e06278f7e47b7d7d5b6ce20dc65c5e96a6f3ca99a6adca0396e8", size = 15148, upload-time = "2022-10-05T19:19:30.546Z" },
 ]
 
 [[package]]
@@ -1207,6 +1218,21 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3", size = 69412, upload-time = "2025-05-15T12:30:07.975Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
+]
+
+[[package]]
+name = "posthog"
+version = "7.35.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "backoff" },
+    { name = "distro" },
+    { name = "requests" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e5/b9/9471861b836eed9be1da207792d8ad69b385e99a174029f13d52467493fa/posthog-7.35.4.tar.gz", hash = "sha256:b0342314599c25bd9d32877a9525f9632ed49037d3b25a920b01be641dd1b368", size = 395178, upload-time = "2026-07-31T11:15:39.463Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e7/94/4e63655fa86054459be1bb50497198efd27bb76db50da977643739fa1c25/posthog-7.35.4-py3-none-any.whl", hash = "sha256:79e3979e7a68b98d2ff2064916eed60b2ee3b2c687e73c41b77e4de00514ec74", size = 468387, upload-time = "2026-07-31T11:15:37.556Z" },
 ]
 
 [[package]]

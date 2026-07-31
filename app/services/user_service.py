@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from app.logger import logger
 from app.repositories.user_repository import UserRepository
+from app.services.analytics_service import capture
 from app.services.auth import hash_password, verify_password
 from app.services.email_service import send_welcome_email
 
@@ -23,6 +24,7 @@ async def register(email: str, password: str, user_repo: UserRepository) -> dict
     terms_accepted_at = datetime.now(timezone.utc)
     user_id = await user_repo.create(email=email, password_hash=password_hash, terms_accepted_at=terms_accepted_at)
     logger.info(f"Inscription : {email}")
+    capture(str(user_id), "signup", {"plan": "free"})
     try:
         await send_welcome_email(email)
     except Exception:
@@ -63,6 +65,7 @@ async def get_or_create_google_user(
 
     user_id = await user_repo.create(email=email, password_hash=None, google_id=google_id)
     logger.info(f"Inscription via Google (nouveau compte) : {email}")
+    capture(str(user_id), "signup", {"plan": "free"})
     try:
         await send_welcome_email(email)
     except Exception:

@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.services import payment_service
 
@@ -8,14 +8,16 @@ async def test_activate_pro_sets_plan_and_customer_id():
     user_repo.set_plan = AsyncMock()
     user_repo.set_stripe_customer_id = AsyncMock()
 
-    await payment_service.activate_pro(
-        user_id="user_id_123",
-        customer_id="cus_stripe_abc",
-        user_repo=user_repo,
-    )
+    with patch("app.services.payment_service.capture") as mock_capture:
+        await payment_service.activate_pro(
+            user_id="user_id_123",
+            customer_id="cus_stripe_abc",
+            user_repo=user_repo,
+        )
 
     user_repo.set_plan.assert_awaited_once_with("user_id_123", "pro")
     user_repo.set_stripe_customer_id.assert_awaited_once_with("user_id_123", "cus_stripe_abc")
+    mock_capture.assert_called_once_with("user_id_123", "upgrade", {})
 
 
 async def test_deactivate_pro_reverts_plan_to_free():

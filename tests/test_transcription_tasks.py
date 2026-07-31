@@ -11,7 +11,7 @@ TRANSCRIPTION_ID: str = "66a1b2c3d4e5f6789abc1234"
 R2_KEY: str = "user123/uuid-audio.mp3"
 FILE_NAME: str = "audio.mp3"
 CONTENT_TYPE: str = "audio/mpeg"
-USER_ID: str = "user123"
+USER_ID: str = "66a1b2c3d4e5f6789abc9999"
 DECLARED_DURATION_SECONDS: float = 999.0  # valeur "mentie" par le client au moment du /confirm
 REAL_DURATION_SECONDS: float = 45.0  # valeur recalculée par la tâche après téléchargement R2
 TRANSCRIBED_TEXT: str = "bonjour le monde"
@@ -69,12 +69,14 @@ def test_transcribe_audio_success() -> None:
     )
     mock_db, mock_transcriptions, mock_stt_usage = _make_mock_db_with_collections()
     mock_stt_usage.find_one.return_value = None  # aucun usage ce mois-ci → 0 seconde consommée
+    mock_transcriptions.count_documents.return_value = 0  # aucune transcription "done" avant celle-ci
 
     with patch("app.tasks.transcription_tasks._download_sync", return_value=b"audio_bytes"), \
          patch("app.tasks.transcription_tasks.audio_service.get_audio_duration_seconds",
                return_value=REAL_DURATION_SECONDS), \
          patch("httpx.Client", return_value=mock_http_client), \
-         patch("app.tasks.transcription_tasks._get_sync_db", return_value=mock_db):
+         patch("app.tasks.transcription_tasks._get_sync_db", return_value=mock_db), \
+         patch("app.tasks.transcription_tasks.capture") as mock_capture:
 
         transcribe_audio.apply(kwargs=_task_kwargs("free"))
 
@@ -88,6 +90,10 @@ def test_transcribe_audio_success() -> None:
             "duration_seconds": REAL_DURATION_SECONDS,
         }},
     )
+    mock_transcriptions.count_documents.assert_called_once_with(
+        {"user_id": ObjectId(USER_ID), "status": "done"}
+    )
+    mock_capture.assert_called_once_with(USER_ID, "first_transcription", {"source": "file"})
     mock_stt_usage.update_one.assert_called_once()
 
 
