@@ -37,7 +37,11 @@ class ReviewRepository:
     async def get_visible(self, limit: int = 20) -> list[dict]:
         cursor = (
             self.collection
-            .find({"is_visible": True})
+            .find({
+                "is_visible": True,
+                "first_name": {"$exists": True},
+                "company": {"$exists": True},
+            })
             .sort("created_at", -1)
             .limit(limit)
         )
