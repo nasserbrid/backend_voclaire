@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Optional
 
 import httpx
 import pymongo
@@ -33,6 +34,7 @@ def transcribe_audio(
     user_plan: str,
     declared_duration_seconds: float,
     source: str,
+    num_speakers: Optional[int] = None,
 ) -> None:
     try:
         file_bytes = _download_sync(r2_key)
@@ -72,10 +74,15 @@ def transcribe_audio(
         ml_timeout = min(real_duration_seconds * 6 + 120, 86400.0)  # cap 24h
         logger.info(f"[task] Envoi '{file_name}' à ml-api{endpoint}")
 
+        form_data = {}
+        if num_speakers is not None:
+            form_data["num_speakers"] = str(num_speakers)
+
         with httpx.Client(timeout=ml_timeout) as client:
             response = client.post(
                 f"{settings.ML_API_URL}{endpoint}",
                 files={"file": (file_name, file_bytes, content_type)},
+                data=form_data,
                 headers={"X-Internal-Api-Key": settings.ML_API_INTERNAL_KEY},
             )
             response.raise_for_status()

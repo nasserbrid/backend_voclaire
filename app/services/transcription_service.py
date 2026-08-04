@@ -72,6 +72,7 @@ async def confirm(
     source: str,
     transcription_repo: TranscriptionRepository,
     stt_usage_repo: SttUsageRepository,
+    num_speakers: Optional[int] = None,
 ) -> TranscriptionOut:
     if not r2_key.startswith(f"{user_id}/"):
         raise InvalidR2Key()
@@ -108,6 +109,7 @@ async def confirm(
         user_plan=user_plan,
         declared_duration_seconds=duration_seconds,
         source=source,
+        num_speakers=num_speakers,
     )
 
     return TranscriptionOut(

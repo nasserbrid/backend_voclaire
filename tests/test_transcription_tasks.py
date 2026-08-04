@@ -97,6 +97,31 @@ def test_transcribe_audio_success() -> None:
     mock_stt_usage.update_one.assert_called_once()
 
 
+def test_transcribe_audio_sends_num_speakers_to_ml_api() -> None:
+    """Quand num_speakers est fourni, il doit être transmis à ml-api via data=form_data."""
+    mock_http_client: MagicMock = _make_mock_http_client(
+        json_response={"text": TRANSCRIBED_TEXT},
+    )
+    mock_db, mock_transcriptions, mock_stt_usage = _make_mock_db_with_collections()
+    mock_stt_usage.find_one.return_value = None
+    mock_transcriptions.count_documents.return_value = 0
+
+    kwargs = _task_kwargs("free")
+    kwargs["num_speakers"] = 3
+
+    with patch("app.tasks.transcription_tasks._download_sync", return_value=b"audio_bytes"), \
+         patch("app.tasks.transcription_tasks.audio_service.get_audio_duration_seconds",
+               return_value=REAL_DURATION_SECONDS), \
+         patch("httpx.Client", return_value=mock_http_client), \
+         patch("app.tasks.transcription_tasks._get_sync_db", return_value=mock_db), \
+         patch("app.tasks.transcription_tasks.capture"):
+
+        transcribe_audio.apply(kwargs=kwargs)
+
+    _args, call_kwargs = mock_http_client.post.call_args
+    assert call_kwargs["data"] == {"num_speakers": "3"}
+
+
 def test_transcribe_audio_ml_api_failure() -> None:
     """Un HTTP 500 de ml-api épuise les retries et force status=error en MongoDB."""
     http_error: httpx.HTTPStatusError = httpx.HTTPStatusError(

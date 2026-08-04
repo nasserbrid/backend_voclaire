@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class TranscriptionOut(BaseModel):
@@ -38,3 +38,4 @@ class ConfirmRequest(BaseModel):
     file_size: int
     duration_seconds: float
     source: Literal["file", "recording"]
+    num_speakers: Optional[int] = Field(None, ge=1, le=20)

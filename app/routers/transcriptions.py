@@ -88,6 +88,7 @@ async def confirm_transcription(
             source=body.source,
             transcription_repo=transcription_repo,
             stt_usage_repo=stt_usage_repo,
+            num_speakers=body.num_speakers,
         )
     except AudioTooLong:
         raise HTTPException(
