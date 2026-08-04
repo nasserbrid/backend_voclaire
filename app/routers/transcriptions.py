@@ -239,6 +239,7 @@ async def export_transcription(
         file_bytes = export_service.generate_docx_free(
             transcription_text=transcription["text"],
             file_name=transcription["file_name"],
+            segments=transcription.get("segments"),
         )
         media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         return Response(content=file_bytes, media_type=media_type, headers={"Content-Disposition": content_disposition})

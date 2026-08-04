@@ -1,4 +1,5 @@
 import io
+from typing import Optional
 
 from docx import Document
 from fpdf import FPDF
@@ -7,10 +8,35 @@ from pptx import Presentation
 from app.logger import logger
 
 
-def generate_docx_free(transcription_text: str, file_name: str) -> bytes:
+def generate_docx_free(
+    transcription_text: str,
+    file_name: str,
+    segments: Optional[list[dict]] = None,
+) -> bytes:
     doc = Document()
     doc.add_heading(file_name, level=1)
-    doc.add_paragraph(transcription_text)
+
+    if segments:
+        speaker_order: dict[str, int] = {}
+        for segment in segments:
+            speaker = segment["speaker"]
+            if speaker not in speaker_order:
+                speaker_order[speaker] = len(speaker_order)
+
+        for segment in segments:
+            speaker_index = speaker_order[segment["speaker"]]
+            minutes = int(segment["start"] // 60)
+            seconds = int(segment["start"] % 60)
+            timestamp = f"{minutes}:{seconds:02d}"
+
+            speaker_paragraph = doc.add_paragraph()
+            speaker_run = speaker_paragraph.add_run(f"Intervenant {speaker_index + 1} · {timestamp}")
+            speaker_run.bold = True
+
+            doc.add_paragraph(segment["text"])
+    else:
+        doc.add_paragraph(transcription_text)
+
     buffer = io.BytesIO()
     doc.save(buffer)
     file_bytes = buffer.getvalue()

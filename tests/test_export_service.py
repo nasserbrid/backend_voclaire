@@ -1,4 +1,7 @@
+import io
 from unittest.mock import MagicMock, patch
+
+from docx import Document
 
 from app.services.export_service import (
     generate_docx_free,
@@ -65,3 +68,32 @@ def test_generate_docx_free_contains_text():
     result = generate_docx_free(transcription_text=texte, file_name="test.mp3")
     # python-docx stocke le contenu en XML dans le zip — le texte apparaît en clair
     assert texte.encode() in result or len(result) > 500
+
+
+def test_generate_docx_free_with_segments_structures_by_speaker():
+    """Avec des segments diarisés, le DOCX doit contenir un bloc par tour de parole
+    (speaker + timestamp en gras, suivi du texte) plutôt qu'un seul paragraphe brut."""
+    segments = [
+        {"speaker": "SPEAKER_01", "text": "Bonjour à tous.", "start": 0.0, "end": 2.0},
+        {"speaker": "SPEAKER_00", "text": "Salut, on commence.", "start": 2.5, "end": 5.0},
+        {"speaker": "SPEAKER_01", "text": "Très bien.", "start": 5.5, "end": 7.0},
+    ]
+
+    result = generate_docx_free(
+        transcription_text="Texte brut ignoré car segments fournis.",
+        file_name="reunion.mp3",
+        segments=segments,
+    )
+
+    doc = Document(io.BytesIO(result))
+    paragraphs_text = [paragraph.text for paragraph in doc.paragraphs]
+
+    # 1 heading + (2 paragraphes par segment : speaker/timestamp + texte) × 3 segments
+    assert len(paragraphs_text) == 1 + 2 * len(segments)
+
+    # SPEAKER_01 apparaît en premier dans les segments → numéroté "Intervenant 1"
+    # SPEAKER_00 apparaît en second → numéroté "Intervenant 2" (ordre d'apparition, pas label brut)
+    assert any("Intervenant 1 · 0:00" in text for text in paragraphs_text)
+    assert any("Intervenant 2 · 0:02" in text for text in paragraphs_text)
+    assert any("Bonjour à tous." in text for text in paragraphs_text)
+    assert any("Salut, on commence." in text for text in paragraphs_text)
