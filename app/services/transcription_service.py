@@ -32,6 +32,10 @@ class SttQuotaExceeded(Exception):
         self.remaining_minutes = remaining_minutes
 
 
+class InvalidR2Key(Exception):
+    pass
+
+
 def _doc_to_out(doc: dict) -> TranscriptionOut:
     return TranscriptionOut(
         id=str(doc["_id"]),
@@ -69,6 +73,9 @@ async def confirm(
     transcription_repo: TranscriptionRepository,
     stt_usage_repo: SttUsageRepository,
 ) -> TranscriptionOut:
+    if not r2_key.startswith(f"{user_id}/"):
+        raise InvalidR2Key()
+
     now = datetime.now(timezone.utc)
 
     # Soft gate : duration_seconds est déclarée par le client, non vérifiée ici.

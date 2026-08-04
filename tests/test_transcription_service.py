@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.services import transcription_service
-from app.services.transcription_service import QuotaExceeded, TranscriptionNotFound
+from app.services.transcription_service import InvalidR2Key, QuotaExceeded, TranscriptionNotFound
 
 # Doc MongoDB minimal retourné par find_one_by_id_and_user_id
 TRANSCRIPTION_DOC = {
@@ -113,3 +113,29 @@ async def test_improve_pro_bypasses_quota_check():
     assert result.improved_text == "Résumé pro."
     # count_this_month ne doit jamais être appelé pour un utilisateur pro
     llm_usage_repo.count_this_month.assert_not_called()
+
+
+async def test_confirm_rejects_r2_key_not_owned_by_user():
+    """Un r2_key ne commençant pas par '{user_id}/' doit être rejeté avant toute autre logique (IDOR)."""
+    transcription_repo = MagicMock()
+    transcription_repo.create = AsyncMock()
+
+    stt_usage_repo = MagicMock()
+    stt_usage_repo.get_seconds_used = AsyncMock()
+
+    with pytest.raises(InvalidR2Key):
+        await transcription_service.confirm(
+            user_id="user_id_abc",
+            user_plan="free",
+            r2_key="autre_user_id/uuid-audio.mp3",
+            file_name="audio.mp3",
+            content_type="audio/mpeg",
+            file_size=2048,
+            duration_seconds=60.0,
+            source="file",
+            transcription_repo=transcription_repo,
+            stt_usage_repo=stt_usage_repo,
+        )
+
+    transcription_repo.create.assert_not_called()
+    stt_usage_repo.get_seconds_used.assert_not_called()

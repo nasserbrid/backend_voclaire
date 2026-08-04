@@ -23,6 +23,7 @@ from app.services.auth import decode_jwt
 from app.services.cookie import COOKIE_NAME
 from app.services.transcription_service import (
     AudioTooLong,
+    InvalidR2Key,
     QuotaExceeded,
     SttQuotaExceeded,
     TranscriptionNotFound,
@@ -97,6 +98,11 @@ async def confirm_transcription(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Quota mensuel dépassé. Il vous reste {error.remaining_minutes} minute(s) ce mois-ci. Passez Pro pour une transcription illimitée.",
+        )
+    except InvalidR2Key:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cette clé de fichier ne vous appartient pas.",
         )
 
 
