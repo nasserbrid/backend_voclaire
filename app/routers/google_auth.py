@@ -6,6 +6,7 @@ from app.dependencies import get_user_repository
 from app.logger import logger
 from app.repositories.user_repository import UserRepository
 from app.services import user_service
+from app.services.user_service import EmailNotVerified
 from app.services.auth import create_jwt
 from app.services.cookie import set_auth_cookie
 from app.services.google_oauth import (
@@ -87,12 +88,20 @@ async def google_callback(
 
     google_id = google_user["sub"]   # identifiant unique Google
     email = google_user["email"]
+    email_verified = google_user.get("email_verified") is True
 
-    result = await user_service.get_or_create_google_user(
-        google_id=google_id,
-        email=email,
-        user_repo=user_repo,
-    )
+    try:
+        result = await user_service.get_or_create_google_user(
+            google_id=google_id,
+            email=email,
+            email_verified=email_verified,
+            user_repo=user_repo,
+        )
+    except EmailNotVerified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Votre adresse email Google n'est pas vérifiée. Vérifiez-la depuis votre compte Google avant de vous connecter à voclaire.",
+        )
     user_id = result["user_id"]
     user_plan = result["plan"]
 

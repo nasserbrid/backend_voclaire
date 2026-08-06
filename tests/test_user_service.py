@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.services import user_service
-from app.services.user_service import EmailAlreadyTaken, InvalidCredentials
+from app.services.user_service import EmailAlreadyTaken, EmailNotVerified, InvalidCredentials
 
 
 async def test_register_ok():
@@ -53,6 +53,7 @@ async def test_google_new_user_sends_welcome_email():
         result = await user_service.get_or_create_google_user(
             google_id="google123",
             email="google@example.com",
+            email_verified=True,
             user_repo=user_repo,
         )
 
@@ -69,11 +70,30 @@ async def test_google_existing_user_no_welcome_email():
         result = await user_service.get_or_create_google_user(
             google_id="google123",
             email="existing@example.com",
+            email_verified=True,
             user_repo=user_repo,
         )
 
     assert result == {"user_id": "existing_id", "plan": "pro"}
     mock_welcome.assert_not_awaited()
+
+
+async def test_google_login_rejects_unverified_email():
+    user_repo = MagicMock()
+    user_repo.find_by_google_id = AsyncMock()
+    user_repo.find_by_email = AsyncMock()
+    user_repo.link_google_id = AsyncMock()
+
+    with pytest.raises(EmailNotVerified):
+        await user_service.get_or_create_google_user(
+            google_id="google123",
+            email="non-verifie@example.com",
+            email_verified=False,
+            user_repo=user_repo,
+        )
+
+    user_repo.find_by_email.assert_not_awaited()
+    user_repo.link_google_id.assert_not_awaited()
 
 
 async def test_register_email_already_taken():

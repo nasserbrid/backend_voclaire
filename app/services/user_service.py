@@ -15,6 +15,10 @@ class InvalidCredentials(Exception):
     pass
 
 
+class EmailNotVerified(Exception):
+    pass
+
+
 async def register(email: str, password: str, user_repo: UserRepository) -> dict:
     existing_user = await user_repo.find_by_email(email)
     if existing_user is not None:
@@ -49,8 +53,13 @@ async def login(email: str, password: str, user_repo: UserRepository) -> dict:
 async def get_or_create_google_user(
     google_id: str,
     email: str,
+    email_verified: bool,
     user_repo: UserRepository,
 ) -> dict:
+    if not email_verified:
+        logger.warning(f"Connexion Google refusée (email non vérifié) : {email}")
+        raise EmailNotVerified()
+
     user_by_google_id = await user_repo.find_by_google_id(google_id)
     if user_by_google_id is not None:
         logger.info(f"Connexion Google (compte Google connu) : {email}")
