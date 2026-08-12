@@ -1,7 +1,7 @@
 import email as email_lib
 from unittest.mock import MagicMock, patch
 
-from app.services.email_service import send_payment_confirmation
+from app.services.email_service import send_payment_confirmation, send_welcome_email
 
 
 def _make_smtp_mock() -> tuple[MagicMock, MagicMock]:
@@ -47,3 +47,24 @@ def test_send_payment_confirmation_annual():
     _, _, message_str = mock_server.sendmail.call_args[0]
     html = _get_html_body(message_str)
     assert "annuel" in html
+
+
+async def test_send_welcome_email():
+    mock_smtp_class, mock_server = _make_smtp_mock()
+
+    with patch("smtplib.SMTP", mock_smtp_class):
+        await send_welcome_email(to_email="nouveau@example.com")
+
+    mock_server.starttls.assert_called_once()
+    mock_server.login.assert_called_once()
+    mock_server.sendmail.assert_called_once()
+
+    _, to_email, message_str = mock_server.sendmail.call_args[0]
+    assert to_email == "nouveau@example.com"
+
+    html = _get_html_body(message_str)
+    assert "4h de fichiers audio" in html
+    assert "4h d'enregistrements de réunion" in html
+    assert "2h max par transcription" in html
+    assert "60 min" not in html
+    assert "/app" in html

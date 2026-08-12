@@ -91,18 +91,32 @@ async def send_contact_notification(
 
 async def send_welcome_email(to_email: str) -> None:
     def _send() -> None:
-        body = (
-            "Bonjour,\n\n"
-            "Votre compte Voclaire est prêt.\n\n"
-            f"Pour transcrire votre première réunion en 2 minutes : {settings.FRONTEND_URL}/app\n\n"
-            "Le plan Free inclut 60 min de transcription par mois, sans carte bancaire.\n\n"
-            "Bonne transcription,\n"
-            "Nasser — fondateur de Voclaire"
-        )
-        msg = MIMEText(body, "plain", "utf-8")
+        html_body = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 24px;">
+        <h1 style="color: #10b981;">Bienvenue sur Voclaire !</h1>
+        <p>Bonjour,</p>
+        <p>Votre compte est prêt. Déposez un fichier audio ou enregistrez une réunion, et récupérez le texte en quelques minutes.</p>
+        <p>Le plan Free inclut <strong>4h de fichiers audio</strong> et <strong>4h d'enregistrements de réunion</strong> par mois (2h max par transcription), sans carte bancaire.</p>
+        <p>
+            <a href="{settings.FRONTEND_URL}/app"
+               style="display: inline-block; background-color: #10b981; color: white;
+                      padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold;">
+                Transcrire mon premier audio
+            </a>
+        </p>
+        <p style="color: #888; font-size: 0.9em; margin-top: 32px;">
+            Nasser — fondateur de Voclaire
+        </p>
+    </body>
+    </html>
+    """
+
+        msg = MIMEMultipart("alternative")
         msg["Subject"] = "Bienvenue sur Voclaire \U0001f389"
         msg["From"] = settings.SMTP_USER
         msg["To"] = to_email
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
 
         with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
             server.starttls()
