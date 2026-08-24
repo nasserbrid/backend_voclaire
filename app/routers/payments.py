@@ -4,6 +4,7 @@ import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.dependencies import get_current_user, get_user_repository
+from app.limiter import limiter
 from app.logger import logger
 from app.repositories.user_repository import UserRepository
 from app.schemas.payment import CheckoutRequest
@@ -15,7 +16,9 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 
 
 @router.post("/checkout")
+@limiter.limit("10/minute")
 async def create_checkout_session(
+    request: Request,
     body: CheckoutRequest,
     current_user: dict = Depends(get_current_user),
 ) -> dict:
@@ -58,7 +61,9 @@ async def create_checkout_session(
 
 
 @router.post("/portal")
+@limiter.limit("10/minute")
 async def create_portal_session(
+    request: Request,
     current_user: dict = Depends(get_current_user),
 ) -> dict:
     stripe_customer_id = current_user.get("stripe_customer_id")

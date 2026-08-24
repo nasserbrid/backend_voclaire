@@ -163,7 +163,9 @@ async def delete_transcription(
 
 
 @router.post("/{transcription_id}/improve", response_model=TranscriptionOut)
+@limiter.limit("10/minute")
 async def improve_transcription(
+    request: Request,
     transcription_id: str,
     body: ImproveRequest,
     current_user: dict = Depends(get_current_user),
@@ -207,7 +209,9 @@ async def improve_transcription(
 
 
 @router.get("/{transcription_id}/export")
+@limiter.limit("20/minute")
 async def export_transcription(
+    request: Request,
     transcription_id: str,
     format: str = Query(..., description="Format d'export : docx, pdf, pptx"),
     current_user: dict = Depends(get_current_user),
