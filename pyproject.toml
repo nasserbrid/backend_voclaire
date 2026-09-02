@@ -29,6 +29,8 @@ dependencies = [
     "sentry-sdk[fastapi]>=2.63.0",
     "slowapi>=0.1.10",
     "stripe>=15.3.0",
+    "langchain-core>=1.6.1",
+    "langchain-openai>=1.6.0",
 ]
 
 [dependency-groups]

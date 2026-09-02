@@ -58,6 +58,12 @@ class Settings(BaseSettings):
     POSTHOG_API_KEY: str = ""
     POSTHOG_HOST: str = "https://eu.i.posthog.com"
 
+    # Étape 21 — Chatbot d'onboarding (LangChain)
+    CHAT_MODEL: str = "gpt-4o-mini"
+    CHAT_MAX_HISTORY: int = 20
+    CHAT_TEMPERATURE: float = 0.2
+    CHAT_MAX_TOKENS: int = 500
+
     def get_cors_list(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
 

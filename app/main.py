@@ -6,7 +6,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.limiter import limiter, rate_limit_handler
 from app.logger import logger
-from app.routers import auth, contacts, demo, google_auth, payments, reviews, transcriptions, users
+from app.routers import auth, chat, contacts, demo, google_auth, payments, reviews, transcriptions, users
 from config.settings import settings
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -39,6 +39,7 @@ app.include_router(payments.router)
 app.include_router(reviews.router)
 app.include_router(contacts.router)
 app.include_router(demo.router)
+app.include_router(chat.router)
 
 
 @app.get("/health")
